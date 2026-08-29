@@ -86,45 +86,62 @@ export function extractThread(article, limit = 3) {
     .filter((p) => p.text);
 }
 
-export function findComposer(root = document) {
-  const boxes = [...root.querySelectorAll(SEL.composer)];
-  return boxes.find((b) => b.isContentEditable && b.offsetParent !== null) || null;
+const DIALOG = '[role="dialog"]';
+
+function visibleComposer(scope) {
+  return (
+    [...scope.querySelectorAll(SEL.composer)].find(
+      (box) => box.isContentEditable && box.offsetParent !== null,
+    ) || null
+  );
+}
+
+// The reply box and the timeline's own "What's happening?" box share the
+// tweetTextarea_* testid, so an unscoped lookup will happily hand back the composer
+// at the top of the feed. Only ever treat a composer inside the reply dialog as the
+// reply target.
+export function findReplyComposer() {
+  const dialog = document.querySelector(DIALOG);
+  return dialog ? visibleComposer(dialog) : null;
 }
 
 // Draft.js ignores textContent assignment because React never sees an input event.
-// execCommand("insertText") is deprecated but it is the one path that still
-// produces a real beforeinput/input pair, which is what the editor listens for.
-export function insertIntoComposer(box, text) {
+// execCommand("insertText") is deprecated but it is the one path that still produces
+// a real beforeinput/input pair, which is what the editor listens for.
+//
+// There is deliberately NO synthetic InputEvent fallback here. Dispatching one after
+// a successful execCommand inserted the text twice, and because a synthetic event is
+// untrusted the editor updated its internal model while the DOM already held the
+// execCommand result. The two diverged, so the next backspace reconciled against the
+// wrong model and corrupted the box. The caller falls back to the clipboard instead.
+export async function insertIntoComposer(box, text) {
   box.focus();
 
   const range = document.createRange();
   range.selectNodeContents(box);
-  const sel = window.getSelection();
-  sel.removeAllRanges();
-  sel.addRange(range);
+  const selection = window.getSelection();
+  selection.removeAllRanges();
+  selection.addRange(range);
 
-  const ok = document.execCommand("insertText", false, text);
-  if (ok && clean(box.innerText)) return true;
+  if (!document.execCommand("insertText", false, text)) return false;
 
-  // Fallback for when execCommand is finally removed.
-  box.dispatchEvent(
-    new InputEvent("beforeinput", {
-      inputType: "insertText",
-      data: text,
-      bubbles: true,
-      cancelable: true,
-    }),
+  // React batches, so the DOM is not updated synchronously. Reading innerText on this
+  // tick is what produced the double insert; wait a frame before believing it.
+  await new Promise((resolve) =>
+    requestAnimationFrame(() => requestAnimationFrame(resolve)),
   );
-  return clean(box.innerText).length > 0;
+
+  const needle = clean(text).slice(0, 20);
+  return clean(box.innerText).includes(needle);
 }
 
-export function waitForComposer(timeout = 4000) {
+export function waitForReplyComposer(timeout = 4000) {
   return new Promise((resolve) => {
-    const existing = findComposer();
+    const existing = findReplyComposer();
     if (existing) return resolve(existing);
 
     const observer = new MutationObserver(() => {
-      const box = findComposer();
+      const box = findReplyComposer();
       if (box) {
         observer.disconnect();
         clearTimeout(timer);
@@ -135,7 +152,9 @@ export function waitForComposer(timeout = 4000) {
 
     const timer = setTimeout(() => {
       observer.disconnect();
-      resolve(null);
+      // A post's detail page opens an inline composer rather than a dialog, so fall
+      // back to any visible one only after the dialog never appeared.
+      resolve(visibleComposer(document));
     }, timeout);
   });
 }

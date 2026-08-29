@@ -1,4 +1,11 @@
-import { SEL, extractPost, extractThread, findComposer, waitForComposer, insertIntoComposer } from "./extract.js";
+import {
+  SEL,
+  extractPost,
+  extractThread,
+  findReplyComposer,
+  waitForReplyComposer,
+  insertIntoComposer,
+} from "./extract.js";
 import {
   showPanel,
   hidePanel,
@@ -49,17 +56,17 @@ async function run(customInstruction = "") {
   clearInstruction();
 }
 
-// X only mounts its composer once the reply modal or inline box is open, so open it
-// first when it is not already there, then wait for the editor to actually exist.
+// X only mounts its composer once the reply dialog is open, so open it first when it
+// is not already there, then wait for the editor to actually exist.
 async function insertReply(text) {
-  let box = findComposer();
+  let box = findReplyComposer();
 
   if (!box) {
     current?.article?.querySelector(SEL.replyButton)?.click();
-    box = await waitForComposer();
+    box = await waitForReplyComposer();
   }
 
-  if (box && insertIntoComposer(box, text)) return true;
+  if (box && (await insertIntoComposer(box, text))) return true;
 
   await navigator.clipboard.writeText(text);
   return false;
