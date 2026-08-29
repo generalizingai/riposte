@@ -81,25 +81,42 @@ Produce exactly 3 replies that take genuinely different approaches. Not three re
 Then call submit_replies with them.`;
 }
 
-export function buildUserMessage({ post, thread, customInstruction }) {
+export function buildUserMessage({ post, context, customInstruction }) {
   const lines = [];
+  const { root, parent } = context || {};
+  const inThread = Boolean(root || parent);
+  const label = (p) => `${p.handle || p.author}: ${p.text}`;
 
-  if (thread?.length) {
-    lines.push("Earlier posts in this conversation, oldest first, for context only:");
-    for (const p of thread) {
-      lines.push(`  ${p.handle || p.author}: ${p.text}`);
-    }
+  if (root) {
+    lines.push("This is a comment thread. The post that started it:");
+    lines.push(`  ${label(root)}`);
     lines.push("");
   }
 
-  lines.push("Reply to this post:");
+  if (parent) {
+    lines.push("The comment being answered by the one you are replying to:");
+    lines.push(`  ${label(parent)}`);
+    lines.push("");
+  }
+
+  lines.push(inThread ? "Reply to this comment:" : "Reply to this post:");
   lines.push(`Author: ${post.author} ${post.handle}`.trim());
-  lines.push(`Post: ${post.text || "(no text, this post is media only)"}`);
+  lines.push(`${inThread ? "Comment" : "Post"}: ${post.text || "(no text, this is media only)"}`);
 
   if (post.quoted) lines.push(`It quote-tweets: ${post.quoted}`);
   if (post.images?.length) lines.push(`Images described by the author: ${post.images.join(" | ")}`);
   if (post.link) lines.push(`Link preview: ${post.link}`);
   if (post.engagement) lines.push(`Reach: ${post.engagement}`);
+
+  if (inThread) {
+    lines.push("");
+    lines.push(
+      "Your reply goes underneath that comment, so it is read by people who can already " +
+        "see the whole thread. Answer the comment, not the original post, and do not " +
+        "summarise either one back at them. Use the original post only to understand what " +
+        "the conversation is actually about.",
+    );
+  }
 
   if (customInstruction?.trim()) {
     lines.push("");

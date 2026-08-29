@@ -94,12 +94,24 @@ export function hidePanel() {
   onVisibility?.(false);
 }
 
-export function setContext(post) {
+export function setContext(post, context) {
   if (!panel) return;
   panel.context.textContent = "";
-  const who = el("span", `${P}-who`, post.handle || post.author || "post");
-  const what = el("span", `${P}-what`, post.text || "(media only)");
-  panel.context.append(who, what);
+
+  // Surface when thread context was picked up, so it is visible that the drafts were
+  // written against the whole conversation and not just the comment in isolation.
+  const root = context?.root;
+  if (root) {
+    const origin = root.handle || root.author || "the original post";
+    panel.context.append(el("div", `${P}-thread`, `in ${origin}'s thread`));
+  }
+
+  const target = el("div", `${P}-target`);
+  target.append(
+    el("span", `${P}-who`, post.handle || post.author || "post"),
+    el("span", `${P}-what`, post.text || "(media only)"),
+  );
+  panel.context.append(target);
 }
 
 export function setLoading(message) {

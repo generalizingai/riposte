@@ -101,7 +101,21 @@
   color: var(--rip-muted);
   border-bottom: 1px solid var(--rip-line);
   display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.riposte-thread {
+  font-size: 11px;
+  opacity: 0.72;
+}
+.riposte-thread::before {
+  content: "\21B3";
+  margin-right: 5px;
+}
+.riposte-target {
+  display: flex;
   gap: 6px;
+  min-width: 0;
 }
 .riposte-who { font-weight: 600; flex: none; color: var(--rip-fg); }
 .riposte-what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

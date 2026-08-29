@@ -1,7 +1,7 @@
 import {
   SEL,
   extractPost,
-  extractThread,
+  extractContext,
   findReplyComposer,
   waitForReplyComposer,
   insertIntoComposer,
@@ -44,7 +44,7 @@ async function run(customInstruction = "") {
 
   const response = await ask("GENERATE", {
     post: current.post,
-    thread: current.thread,
+    context: current.context,
     customInstruction,
     toneOverride: current.tone,
   });
@@ -78,7 +78,7 @@ async function openFor(article) {
   current = {
     article,
     post: extractPost(article),
-    thread: extractThread(article),
+    context: extractContext(article),
     tone,
   };
 
@@ -93,7 +93,7 @@ async function openFor(article) {
     },
   });
 
-  setContext(current.post);
+  setContext(current.post, current.context);
   run();
 }
 

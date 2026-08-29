@@ -31,6 +31,8 @@ The point is not to produce more replies. It is to produce replies that are wort
 - **It refuses to pad.** The prompt bans the whole register of AI slop: no "This.", no "Great point", no
   restating the post back at its author, no engagement-bait question tacked on the end. When it has nothing
   specific to add it writes something shorter rather than something longer.
+- **It reads the whole thread.** Replying to a comment pulls in the post that started the conversation and
+  the comment being answered, so the draft makes sense to someone reading top to bottom.
 - **It can check its facts.** With web search on, it looks up a real number or source before replying, and
   is told explicitly that a confident wrong figure posted from your account is the worst possible outcome.
 

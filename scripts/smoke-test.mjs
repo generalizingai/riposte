@@ -29,7 +29,19 @@ const client = new Anthropic({ apiKey, maxRetries: 2 });
 const tools = [SUBMIT_TOOL];
 if (useSearch) tools.push({ type: "web_search_20260209", name: "web_search", max_uses: 4 });
 
-const messages = [{ role: "user", content: buildUserMessage({ post, thread: [], customInstruction: "" }) }];
+// Pass --thread to exercise the comment-thread path instead of a standalone post.
+const context = process.argv.includes("--thread")
+  ? {
+      root: {
+        author: "Lydia Wyatt",
+        handle: "@lydiaships",
+        text: "What is your distribution strategy once you build a product if you don't have an audience already?",
+      },
+      parent: null,
+    }
+  : { root: null, parent: null };
+
+const messages = [{ role: "user", content: buildUserMessage({ post, context, customInstruction: "" }) }];
 
 const system = buildSystem({
   voiceSamples: "shipped it. turns out the hard part was never the code.\nspent 3 hours on a bug that was a trailing slash. anyway.",

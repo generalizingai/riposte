@@ -27,7 +27,7 @@ function findSubmission(content) {
   return null;
 }
 
-async function generate({ post, thread, customInstruction, toneOverride }) {
+async function generate({ post, context, customInstruction, toneOverride }) {
   const settings = await getSettings();
   if (!settings.apiKey) {
     throw new Error("No API key set. Open the extension options and paste your Anthropic API key.");
@@ -43,7 +43,7 @@ async function generate({ post, thread, customInstruction, toneOverride }) {
     useSearch: settings.useSearch,
   });
 
-  const messages = [{ role: "user", content: buildUserMessage({ post, thread, customInstruction }) }];
+  const messages = [{ role: "user", content: buildUserMessage({ post, context, customInstruction }) }];
   const tools = collectTools(settings.useSearch);
 
   // Server tools can return pause_turn when they need another round trip. Echo the

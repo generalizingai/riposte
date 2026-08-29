@@ -51,6 +51,14 @@ function readImages(article) {
     .filter((alt) => alt && alt.length > 8 && alt.toLowerCase() !== "image");
 }
 
+// X prints "Replying to @handle" above a reply. That line is the only reliable
+// structural link back to a comment's parent, since the article directly above it in
+// the DOM is usually a sibling comment rather than an ancestor.
+function readReplyingTo(article) {
+  const match = article.innerText.slice(0, 400).match(/Replying to\s+(@\w+)/i);
+  return match ? match[1] : "";
+}
+
 function readEngagement(article) {
   const label = article.querySelector(SEL.likeButton)?.getAttribute("aria-label") || "";
   const n = label.match(/([\d,.]+)\s*(K|M)?\s*likes?/i);
@@ -69,21 +77,56 @@ export function extractPost(article) {
     images: readImages(article),
     link: clean(article.querySelector(SEL.card)?.innerText).slice(0, 300),
     engagement: readEngagement(article),
-    isReply: /Replying to/i.test(article.innerText.slice(0, 400)),
+    replyingTo: readReplyingTo(article),
   };
 }
 
-// On a conversation page the posts above the target are its ancestors, so they are
-// the context the reply has to make sense inside. On the timeline there is no
-// meaningful "above", so cap this tightly and let the model ignore it.
-export function extractThread(article, limit = 3) {
+const STATUS_PATH = /^\/[^/]+\/status\/\d+/;
+
+function onConversationPage() {
+  return STATUS_PATH.test(location.pathname);
+}
+
+// Replying to a comment only makes sense with the post that started the thread, and
+// with the comment it is itself answering. Both are found structurally rather than by
+// counting articles upward: on a conversation page the replies are a flat list, so the
+// article directly above the target is usually an unrelated sibling comment, and on
+// the timeline the posts above are unrelated entirely.
+export function extractContext(article) {
   const all = [...document.querySelectorAll(SEL.tweet)];
-  const idx = all.indexOf(article);
-  if (idx <= 0) return [];
-  return all
-    .slice(Math.max(0, idx - limit), idx)
-    .map(extractPost)
-    .filter((p) => p.text);
+  const index = all.indexOf(article);
+  if (index <= 0) return { root: null, parent: null };
+
+  const before = all.slice(0, index);
+  const target = extractPost(article);
+
+  if (!onConversationPage()) {
+    // On the timeline, only trust the post directly above, and only when X is
+    // presenting this one as a reply to it.
+    if (!target.replyingTo) return { root: null, parent: null };
+    const previous = extractPost(before[before.length - 1]);
+    return {
+      root: null,
+      parent: previous.handle === target.replyingTo && previous.text ? previous : null,
+    };
+  }
+
+  // On a permalink page the first article is the post the whole page is about.
+  const root = extractPost(before[0]);
+
+  // Walk back for the specific comment this one answers, when it is not the root.
+  let parent = null;
+  if (target.replyingTo && target.replyingTo !== root.handle) {
+    for (let i = before.length - 1; i >= 1; i -= 1) {
+      const candidate = extractPost(before[i]);
+      if (candidate.handle === target.replyingTo && candidate.text) {
+        parent = candidate;
+        break;
+      }
+    }
+  }
+
+  return { root: root.text ? root : null, parent };
 }
 
 const DIALOG = '[role="dialog"]';
