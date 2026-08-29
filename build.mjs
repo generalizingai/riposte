@@ -35,6 +35,11 @@ const shared = {
   outdir: "dist",
   logLevel: "info",
   plugins: [stubNodeBuiltins],
+  // esbuild walks up the directory tree for a tsconfig.json and applies what it finds.
+  // A checkout sitting under an unrelated project would silently inherit that project's
+  // target, strictness or path aliases, so the build would differ depending on where the
+  // repo happens to live. An empty config pins it to exactly the options set here.
+  tsconfigRaw: {},
 };
 
 // The MV3 service worker is declared as "type": "module", so it ships as ESM.
