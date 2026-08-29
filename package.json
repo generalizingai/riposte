@@ -1,0 +1,20 @@
+{
+  "name": "riposte",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Riposte drafts replies worth sending, in your own voice.",
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "node build.mjs --watch",
+    "package": "npm run build && cd dist && zip -qr ../riposte-v$npm_package_version.zip . && cd .. && echo \"packaged riposte-v$npm_package_version.zip\""
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.122.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  },
+  "license": "MIT",
+  "author": "Hamza Shergill"
+}

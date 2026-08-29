@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Riposte</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main>
+      <div class="brand">
+        <img src="icons/mark.png" alt="" />
+        <h1>Riposte</h1>
+      </div>
+      <p class="sub">Drafts replies worth sending, in your voice. Nothing posts automatically.</p>
+
+      <section>
+        <h2>API key</h2>
+        <div class="row">
+          <input id="apiKey" type="password" placeholder="sk-ant-..." autocomplete="off" spellcheck="false" />
+          <button id="test" type="button">Test</button>
+        </div>
+        <p class="hint">
+          Stored unencrypted in this browser profile's extension storage and sent only to
+          api.anthropic.com. Anyone with access to this Mac account can read it. Use a key
+          scoped to this tool so you can revoke it on its own.
+        </p>
+      </section>
+
+      <section>
+        <h2>Generation</h2>
+        <div class="grid">
+          <label>
+            <span>Model</span>
+            <select id="model">
+              <option value="claude-opus-5">Opus 5 (best writing)</option>
+              <option value="claude-sonnet-5">Sonnet 5 (faster, cheaper)</option>
+              <option value="claude-haiku-4-5">Haiku 4.5 (fastest)</option>
+            </select>
+          </label>
+          <label>
+            <span>Effort</span>
+            <select id="effort">
+              <option value="low">Low (snappiest)</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="xhigh">Extra high</option>
+              <option value="max">Max</option>
+            </select>
+          </label>
+          <label>
+            <span>Default angle</span>
+            <select id="tone"></select>
+          </label>
+          <label>
+            <span>Character limit</span>
+            <select id="maxChars">
+              <option value="280">280 (free account)</option>
+              <option value="4000">4000 (Premium)</option>
+              <option value="25000">25000 (Premium+)</option>
+            </select>
+          </label>
+        </div>
+        <label class="check">
+          <input id="useSearch" type="checkbox" />
+          <span>
+            Let Claude search the web for a real fact before replying. Slower and costs more,
+            but it is the difference between sounding informed and being informed.
+          </span>
+        </label>
+      </section>
+
+      <section>
+        <h2>Your voice</h2>
+        <p class="hint">
+          Paste 15 to 30 of your own posts, one per line. This is what stops the replies reading
+          like everyone else's AI. Topics do not matter, only how you write.
+        </p>
+        <textarea id="voiceSamples" rows="12" placeholder="paste your own posts here, one per line"></textarea>
+      </section>
+
+      <div class="actions">
+        <button id="save" type="button" class="primary">Save</button>
+        <span id="status" role="status"></span>
+      </div>
+    </main>
+    <script src="options.js"></script>
+  </body>
+</html>
