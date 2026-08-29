@@ -58,7 +58,7 @@ Chrome, or any Chromium browser that supports Manifest V3.
 ### From source
 
 ```bash
-git clone https://github.com/logicbaseio/riposte.git
+git clone https://github.com/generalizingai/riposte.git
 cd riposte
 npm install
 npm run build
