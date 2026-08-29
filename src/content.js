@@ -120,13 +120,20 @@ function panelHandlers(mode, angles) {
   };
 }
 
+const identity = (post) => `${post.handle}|${(post.text || "").slice(0, 40)}`;
+
 async function openFor(article) {
   const { tone } = await settings();
+  const post = extractPost(article);
+
+  // X recycles article nodes, so compare the post itself rather than the element.
+  const sameAsLast = current?.mode === "reply" && identity(current.post) === identity(post);
+  if (sameAsLast && restorePanel()) return;
 
   current = {
     mode: "reply",
     article,
-    post: extractPost(article),
+    post,
     context: extractContext(article),
     tone,
   };
@@ -154,8 +161,9 @@ let fab = null;
 // The launcher is where writing something new starts. Replying already has its own
 // entry point on each post, so the floating button owns compose.
 function openFromLauncher() {
-  // Reopening a panel that already has drafts should not cost another request.
-  if (current && restorePanel()) return;
+  // Only bring back a previous compose session. Restoring a reply panel from here
+  // would be surprising now that the launcher means "write something new".
+  if (current?.mode === "compose" && restorePanel()) return;
   openCompose(null);
 }
 
