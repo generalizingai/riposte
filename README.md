@@ -6,8 +6,8 @@
 </p>
 
 <p align="center">
-  <strong>Drafts replies worth sending, in your own voice.</strong><br>
-  A Chrome extension that reads the post you are looking at and writes three replies you would actually post.
+  <strong>Drafts replies and posts worth sending, in your own voice.</strong><br>
+  A Chrome extension that drafts three replies to the post you are reading, or three original posts from an idea.
 </p>
 
 <p align="center">
@@ -20,8 +20,8 @@
 
 ## What it does
 
-Click **Riposte** on any post, or hit the floating launcher, and you get three drafts that take genuinely
-different approaches. Each one is labelled with the angle it took, counted against your character limit,
+Click **Riposte** on any post to draft replies, or hit the floating launcher to write something of your own.
+Either way you get three drafts that take genuinely different approaches. Each one is labelled with the angle it took, counted against your character limit,
 and one click away from being in the reply box.
 
 The point is not to produce more replies. It is to produce replies that are worth reading:
@@ -31,6 +31,8 @@ The point is not to produce more replies. It is to produce replies that are wort
 - **It refuses to pad.** The prompt bans the whole register of AI slop: no "This.", no "Great point", no
   restating the post back at its author, no engagement-bait question tacked on the end. When it has nothing
   specific to add it writes something shorter rather than something longer.
+- **It writes your own posts too.** Give the launcher a rough idea and it drafts three takes on it, with a
+  separate set of angles and its own list of banned X-post tics.
 - **It reads the whole thread.** Replying to a comment pulls in the post that started the conversation and
   the comment being answered, so the draft makes sense to someone reading top to bottom.
 - **It can check its facts.** With web search on, it looks up a real number or source before replying, and
@@ -98,6 +100,24 @@ Switch between these from the panel at any time, and redraft without losing what
 | **Question** | The one question whose answer would change how you read the post. |
 
 You can also type a free-text steer ("shorter", "push back harder", "mention the study") and redraft.
+
+## Writing your own posts
+
+The floating launcher opens compose mode. Type a rough idea, press **Write**, and get three takes on it.
+Posts get their own angles, because "supportive" means nothing when there is no post above you.
+
+| Angle | What it does |
+|---|---|
+| **Conversational** | Says the thing the way you would say it to one person. |
+| **Observation** | One sharp noticing about how something actually works. |
+| **Story** | One specific thing that happened. No moral bolted on the end. |
+| **Contrarian** | The part the consensus has wrong, and why. |
+| **Lesson** | Something learned the expensive way, told flat rather than as advice. |
+| **Question** | A real question, narrow enough to answer in one line. |
+
+Posts also get their own anti-slop list, aimed at the register X rewards and readers resent: no
+"Here's the thing", no "Unpopular opinion", no hook-colon-list, no thread emoji, no closing "Thoughts?",
+no one-sentence-per-line profundity.
 
 ## Privacy
 

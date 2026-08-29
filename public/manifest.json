@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Riposte",
   "version": "0.1.0",
-  "description": "Drafts three replies worth sending, in your voice. Nothing posts automatically.",
+  "description": "Drafts three replies to any post, or three original posts from an idea. Nothing posts automatically.",
   "permissions": [
     "storage"
   ],

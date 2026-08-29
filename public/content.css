@@ -365,3 +365,33 @@
   font-weight: 400;
   opacity: 0.65;
 }
+
+/* Compose mode. The idea box lives in the context row so it survives redrafts, while
+   the footer input stays the transient steer. */
+
+.riposte-topic {
+  all: unset;
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-height: 54px;
+  resize: vertical;
+  font: 400 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  padding: 9px 11px;
+  border-radius: 6px;
+  border: 1px solid var(--rip-line);
+  background: var(--rip-surface);
+  color: var(--rip-fg);
+}
+.riposte-topic:focus {
+  border-color: var(--rip-line-strong);
+}
+.riposte-topic::placeholder {
+  color: #6a6a6a;
+}
+
+.riposte-idle {
+  padding: 20px 4px;
+  font-size: 13px;
+  color: var(--rip-muted);
+}

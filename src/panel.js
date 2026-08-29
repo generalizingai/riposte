@@ -1,4 +1,3 @@
-import { TONES } from "./prompt.js";
 import { enhanceSelect } from "./select.js";
 
 const P = "riposte";
@@ -17,22 +16,19 @@ function el(tag, cls, text) {
   return node;
 }
 
+const title = (key) => key[0].toUpperCase() + key.slice(1);
+
 function buildShell() {
   const root = el("div", `${P}-panel`);
 
   const header = el("div", `${P}-header`);
-
   const mark = el("img", `${P}-mark`);
   mark.src = chrome.runtime.getURL("icons/mark.png");
   mark.alt = "";
   header.append(mark, el("div", `${P}-title`, "Riposte"));
 
+  // Populated per mode, since replies and original posts take different angles.
   const tone = el("select", `${P}-tone`);
-  for (const key of Object.keys(TONES)) {
-    const option = el("option", null, key[0].toUpperCase() + key.slice(1));
-    option.value = key;
-    tone.append(option);
-  }
   tone.addEventListener("change", () => handlers.onTone?.(tone.value));
   header.append(tone);
 
@@ -49,17 +45,27 @@ function buildShell() {
 
   const footer = el("form", `${P}-footer`);
   const input = el("input", `${P}-instruction`);
-  input.placeholder = "Optional steer: shorter, push back harder, mention the study";
-  const regen = el("button", `${P}-regen`, "Redraft");
-  regen.type = "submit";
-  footer.append(input, regen);
+  const submit = el("button", `${P}-regen`, "Redraft");
+  submit.type = "submit";
+  footer.append(input, submit);
   footer.addEventListener("submit", (event) => {
     event.preventDefault();
     handlers.onRegenerate?.(input.value);
   });
 
   root.append(header, context, body, footer);
-  return { root, tone, toneSelect, context, body, input };
+  return { root, tone, toneSelect, context, body, input, submit, topic: null };
+}
+
+function setAngles(angles, selected) {
+  panel.tone.textContent = "";
+  for (const key of Object.keys(angles)) {
+    const option = el("option", null, title(key));
+    option.value = key;
+    panel.tone.append(option);
+  }
+  panel.tone.value = selected;
+  panel.toneSelect.rebuild();
 }
 
 export function showPanel(opts) {
@@ -68,8 +74,16 @@ export function showPanel(opts) {
     panel = buildShell();
     document.body.append(panel.root);
   }
-  panel.tone.value = opts.tone;
-  panel.toneSelect.sync();
+
+  const composing = opts.mode === "compose";
+  panel.root.dataset.mode = opts.mode || "reply";
+  setAngles(opts.angles, opts.tone);
+
+  panel.input.placeholder = composing
+    ? "Optional steer: shorter, more specific, less certain"
+    : "Optional steer: shorter, push back harder, mention the study";
+  panel.submit.textContent = composing ? "Write" : "Redraft";
+
   panel.root.style.display = "flex";
   onVisibility?.(true);
   return panel;
@@ -94,9 +108,10 @@ export function hidePanel() {
   onVisibility?.(false);
 }
 
-export function setContext(post, context) {
+export function setReplyContext(post, context) {
   if (!panel) return;
   panel.context.textContent = "";
+  panel.topic = null;
 
   // Surface when thread context was picked up, so it is visible that the drafts were
   // written against the whole conversation and not just the comment in isolation.
@@ -114,6 +129,36 @@ export function setContext(post, context) {
   panel.context.append(target);
 }
 
+// In compose mode the context row becomes the idea box. It stays put across redrafts,
+// while the footer input holds the transient steer.
+export function setComposeContext(source) {
+  if (!panel) return;
+  panel.context.textContent = "";
+
+  if (source?.text) {
+    const who = source.handle || source.author || "a post";
+    panel.context.append(el("div", `${P}-thread`, `riffing on ${who}, not replying to them`));
+  }
+
+  const topic = el("textarea", `${P}-topic`);
+  topic.placeholder = "What do you want to say? A rough idea is enough.";
+  topic.rows = 2;
+  topic.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault();
+      handlers.onRegenerate?.(panel.input.value);
+    }
+  });
+
+  panel.context.append(topic);
+  panel.topic = topic;
+  topic.focus();
+}
+
+export function getTopic() {
+  return panel?.topic?.value || "";
+}
+
 export function setLoading(message) {
   if (!panel) return;
   panel.body.textContent = "";
@@ -128,6 +173,12 @@ export function setError(message) {
   panel.body.append(el("div", `${P}-error`, message));
 }
 
+export function setIdle(message) {
+  if (!panel) return;
+  panel.body.textContent = "";
+  panel.body.append(el("div", `${P}-idle`, message));
+}
+
 export function setReplies(replies, maxChars) {
   if (!panel) return;
   panel.body.textContent = "";
@@ -135,9 +186,7 @@ export function setReplies(replies, maxChars) {
   replies.forEach((reply) => {
     const card = el("div", `${P}-card`);
     card.append(el("div", `${P}-angle`, reply.angle || "draft"));
-
-    const text = el("div", `${P}-text`, reply.text);
-    card.append(text);
+    card.append(el("div", `${P}-text`, reply.text));
 
     const row = el("div", `${P}-row`);
     const over = reply.text.length > maxChars;

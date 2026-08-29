@@ -3,6 +3,7 @@ export const DEFAULTS = {
   model: "claude-opus-5",
   effort: "medium",
   tone: "insightful",
+  postAngle: "conversational",
   voiceSamples: "",
   maxChars: 280,
   useSearch: false,

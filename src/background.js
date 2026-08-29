@@ -1,5 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { buildSystem, buildUserMessage, SUBMIT_TOOL } from "./prompt.js";
+import {
+  buildSystem,
+  buildUserMessage,
+  buildPostSystem,
+  buildPostMessage,
+  SUBMIT_TOOL,
+} from "./prompt.js";
 import { getSettings } from "./settings.js";
 
 function makeClient(apiKey) {
@@ -27,23 +33,35 @@ function findSubmission(content) {
   return null;
 }
 
-async function generate({ post, context, customInstruction, toneOverride }) {
+async function generate({ mode, post, context, topic, source, customInstruction, toneOverride }) {
   const settings = await getSettings();
   if (!settings.apiKey) {
     throw new Error("No API key set. Open the extension options and paste your Anthropic API key.");
   }
 
-  const client = makeClient(settings.apiKey);
-  const tone = toneOverride || settings.tone;
+  const composing = mode === "compose";
+  if (composing && !topic?.trim()) {
+    throw new Error("Type what you want to say first.");
+  }
 
-  const system = buildSystem({
+  const client = makeClient(settings.apiKey);
+  const tone = toneOverride || (composing ? settings.postAngle : settings.tone);
+
+  const shared = {
     voiceSamples: settings.voiceSamples,
-    tone,
     maxChars: settings.maxChars,
     useSearch: settings.useSearch,
-  });
+  };
 
-  const messages = [{ role: "user", content: buildUserMessage({ post, context, customInstruction }) }];
+  const system = composing
+    ? buildPostSystem({ ...shared, angle: tone })
+    : buildSystem({ ...shared, tone });
+
+  const content = composing
+    ? buildPostMessage({ topic, source, customInstruction })
+    : buildUserMessage({ post, context, customInstruction });
+
+  const messages = [{ role: "user", content }];
   const tools = collectTools(settings.useSearch);
 
   // Server tools can return pause_turn when they need another round trip. Echo the

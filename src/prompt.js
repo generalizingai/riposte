@@ -126,11 +126,100 @@ export function buildUserMessage({ post, context, customInstruction }) {
   return lines.join("\n");
 }
 
+// Original posts need their own angles. "Supportive" has nothing to agree with when
+// there is no post above you.
+export const POST_ANGLES = {
+  conversational:
+    "Just say the thing, the way you would say it to one person. No setup, no framing, no reveal.",
+  observation:
+    "One sharp noticing about how something actually works. The kind of line that makes a reader stop because it is true and they had not put it that way.",
+  story:
+    "One specific thing that happened, told in a few sentences. Real details, real numbers, no moral at the end. The story is the point, not a delivery mechanism for a lesson.",
+  contrarian:
+    "Say the thing the consensus has wrong. Be specific about which part is wrong and why, not just against it for the posture.",
+  lesson:
+    "Something learned the expensive way. What you believed, what it actually cost you, what you do now. Told flat, not as advice to anyone.",
+  question:
+    "A genuine question you actually want answered, narrow enough that someone can answer it in one line.",
+};
+
+// X has its own register of slop, distinct from reply slop, and it is instantly
+// recognisable. This is the list of things that make a post read as content rather
+// than as a person saying something.
+const POST_ANTI_SLOP = `
+Hard rules. Breaking any one of these makes the post worthless:
+
+- Never open with "Here's the thing", "Unpopular opinion", "Hot take", "Nobody talks about this",
+  "Most people don't realise", "Let me explain", or a number ("3 things I learned").
+- Never end with "Agree?", "Thoughts?", "Let that sink in", "Read that again", or any other
+  instruction to the reader.
+- No hook line followed by a colon and a list. No thread emoji, no "🧵", no "a thread".
+- No one-sentence-per-line formatting to fake profundity. Write in normal paragraphs.
+- No manufactured vulnerability, and no story that exists only to set up a lesson.
+- No advice addressed to a general audience. Say what is true for you and let the reader take it.
+- Never use em dashes or en dashes. Use a spaced hyphen or restructure the sentence.
+- No hashtags. No emoji unless the writing samples use them.
+
+Concrete beats abstract every time. A number, a name, a year, a mechanism. If you cannot be
+specific, write less rather than dressing it up. A short flat post beats a long performed one.
+`.trim();
+
+export function buildPostSystem({ voiceSamples, angle, maxChars, useSearch }) {
+  const angleLine = POST_ANGLES[angle] || POST_ANGLES.conversational;
+
+  return `You write original posts on X for one specific person, in their voice, to be posted
+from their account. The post must be ready to send with no editing.
+
+${voiceSection(voiceSamples)}
+
+Angle for this batch: ${angleLine}
+
+${POST_ANTI_SLOP}
+
+Length: keep every post under ${maxChars} characters. The best posts on X are shorter than the
+writer wanted them to be.
+${
+  useSearch
+    ? `
+You have web search. Use it when a real number, date, study, or example would make the post land,
+and when you are not certain of the detail from memory. Never paste a bare URL. If search turns up
+nothing useful, write the post without it rather than inventing a figure. A confident wrong number
+posted from this person's account is the worst possible outcome.`
+    : ""
+}
+
+Produce exactly 3 posts that are genuinely different takes on the idea, not three rewordings of
+one. Then call submit_replies with them.`;
+}
+
+export function buildPostMessage({ topic, source, customInstruction }) {
+  const lines = [];
+
+  lines.push("Write a post about this idea:");
+  lines.push(topic.trim());
+
+  if (source?.text) {
+    lines.push("");
+    lines.push(
+      "The user was reading this post when they had the idea. Use it only as background. Do not " +
+        "reply to it, do not mention it, and do not address its author. This is a standalone post.",
+    );
+    lines.push(`  ${source.handle || source.author}: ${source.text}`);
+  }
+
+  if (customInstruction?.trim()) {
+    lines.push("");
+    lines.push(`Additional instruction from the user, this overrides the default angle: ${customInstruction.trim()}`);
+  }
+
+  return lines.join("\n");
+}
+
 // A strict tool is the reliable way to get schema-valid JSON back while still
 // leaving the model free to call web search first.
 export const SUBMIT_TOOL = {
   name: "submit_replies",
-  description: "Return the three drafted replies. Call this once, at the end, after any research.",
+  description: "Return the three drafts. Call this once, at the end, after any research.",
   strict: true,
   input_schema: {
     type: "object",
@@ -139,13 +228,13 @@ export const SUBMIT_TOOL = {
     properties: {
       replies: {
         type: "array",
-        description: "Exactly three replies, each taking a different approach.",
+        description: "Exactly three drafts, each taking a different approach.",
         items: {
           type: "object",
           additionalProperties: false,
           required: ["text", "angle"],
           properties: {
-            text: { type: "string", description: "The reply exactly as it should be posted." },
+            text: { type: "string", description: "The draft exactly as it should be posted." },
             angle: {
               type: "string",
               description: "Two to four words naming the approach, e.g. 'adds a number', 'friendly pushback', 'reframes the question'.",

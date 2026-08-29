@@ -4,6 +4,9 @@ import {
   extractContext,
   findReplyComposer,
   waitForReplyComposer,
+  findPostComposer,
+  openPostComposer,
+  waitForPostComposer,
   insertIntoComposer,
 } from "./extract.js";
 import {
@@ -12,12 +15,16 @@ import {
   restorePanel,
   isPanelOpen,
   onPanelVisibility,
-  setContext,
+  setReplyContext,
+  setComposeContext,
+  getTopic,
   setLoading,
   setError,
+  setIdle,
   setReplies,
   clearInstruction,
 } from "./panel.js";
+import { TONES, POST_ANGLES } from "./prompt.js";
 
 const TRIGGER = "riposte-trigger";
 let current = null; // { article, post, thread, tone }
@@ -34,17 +41,33 @@ function ask(type, payload) {
 }
 
 async function settings() {
-  const { tone = "insightful", maxChars = 280 } = await chrome.storage.local.get(["tone", "maxChars"]);
-  return { tone, maxChars };
+  const {
+    tone = "insightful",
+    postAngle = "conversational",
+    maxChars = 280,
+  } = await chrome.storage.local.get(["tone", "postAngle", "maxChars"]);
+  return { tone, postAngle, maxChars };
 }
 
 async function run(customInstruction = "") {
   if (!current) return;
-  setLoading(customInstruction ? "Redrafting" : "Reading the post and drafting");
+
+  const composing = current.mode === "compose";
+  const topic = getTopic();
+  if (composing && !topic.trim()) {
+    return setIdle("Type what you want to say, then press Write.");
+  }
+
+  setLoading(
+    composing ? "Writing" : customInstruction ? "Redrafting" : "Reading the post and drafting",
+  );
 
   const response = await ask("GENERATE", {
+    mode: current.mode,
     post: current.post,
     context: current.context,
+    topic,
+    source: current.source,
     customInstruction,
     toneOverride: current.tone,
   });
@@ -56,14 +79,24 @@ async function run(customInstruction = "") {
   clearInstruction();
 }
 
-// X only mounts its composer once the reply dialog is open, so open it first when it
-// is not already there, then wait for the editor to actually exist.
-async function insertReply(text) {
-  let box = findReplyComposer();
+// A reply targets the dialog composer; an original post targets the main one. They
+// are deliberately separate lookups, since the timeline's own box and the reply box
+// share a testid and picking the wrong one puts the draft in the wrong place.
+async function insertDraft(text) {
+  let box = null;
 
-  if (!box) {
-    current?.article?.querySelector(SEL.replyButton)?.click();
-    box = await waitForReplyComposer();
+  if (current?.mode === "compose") {
+    box = findPostComposer();
+    if (!box) {
+      openPostComposer();
+      box = await waitForPostComposer();
+    }
+  } else {
+    box = findReplyComposer();
+    if (!box) {
+      current?.article?.querySelector(SEL.replyButton)?.click();
+      box = await waitForReplyComposer();
+    }
   }
 
   if (box && (await insertIntoComposer(box, text))) return true;
@@ -72,29 +105,45 @@ async function insertReply(text) {
   return false;
 }
 
+function panelHandlers(mode, angles) {
+  return {
+    mode,
+    angles,
+    onInsert: insertDraft,
+    onRegenerate: (instruction) => run(instruction),
+    onTone: (value) => {
+      current.tone = value;
+      chrome.storage.local.set(mode === "compose" ? { postAngle: value } : { tone: value });
+      if (mode === "compose" && !getTopic().trim()) return;
+      run();
+    },
+  };
+}
+
 async function openFor(article) {
   const { tone } = await settings();
 
   current = {
+    mode: "reply",
     article,
     post: extractPost(article),
     context: extractContext(article),
     tone,
   };
 
-  showPanel({
-    tone,
-    onInsert: insertReply,
-    onRegenerate: (instruction) => run(instruction),
-    onTone: (value) => {
-      current.tone = value;
-      chrome.storage.local.set({ tone: value });
-      run();
-    },
-  });
-
-  setContext(current.post, current.context);
+  showPanel({ ...panelHandlers("reply", TONES), tone });
+  setReplyContext(current.post, current.context);
   run();
+}
+
+async function openCompose(source) {
+  const { postAngle } = await settings();
+
+  current = { mode: "compose", source, tone: postAngle };
+
+  showPanel({ ...panelHandlers("compose", POST_ANGLES), tone: postAngle });
+  setComposeContext(source);
+  setIdle("Type what you want to say, then press Write.");
 }
 
 // Floating launcher. X parks its own Grok and chat buttons in the bottom-right
@@ -102,30 +151,12 @@ async function openFor(article) {
 // stack is on any given page.
 let fab = null;
 
-function nearestPost() {
-  const middle = window.innerHeight / 2;
-  let best = null;
-  let bestDistance = Infinity;
-
-  for (const article of document.querySelectorAll(SEL.tweet)) {
-    const rect = article.getBoundingClientRect();
-    if (rect.bottom < 0 || rect.top > window.innerHeight) continue;
-
-    const distance = Math.abs((rect.top + rect.bottom) / 2 - middle);
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      best = article;
-    }
-  }
-  return best;
-}
-
+// The launcher is where writing something new starts. Replying already has its own
+// entry point on each post, so the floating button owns compose.
 function openFromLauncher() {
   // Reopening a panel that already has drafts should not cost another request.
   if (current && restorePanel()) return;
-
-  const article = nearestPost();
-  if (article) openFor(article);
+  openCompose(null);
 }
 
 function mountLauncher() {
@@ -134,8 +165,8 @@ function mountLauncher() {
   fab = document.createElement("button");
   fab.className = "riposte-fab";
   fab.type = "button";
-  fab.title = "Riposte";
-  fab.setAttribute("aria-label", "Open Riposte");
+  fab.title = "Write a post with Riposte";
+  fab.setAttribute("aria-label", "Write a post with Riposte");
 
   const mark = document.createElement("img");
   mark.src = chrome.runtime.getURL("icons/glyph.png");

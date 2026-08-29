@@ -12,6 +12,7 @@ export const SEL = {
   quote: 'div[role="link"][tabindex]',
   composer: '[data-testid^="tweetTextarea_"]',
   likeButton: '[data-testid="like"], [data-testid="unlike"]',
+  newPost: '[data-testid="SideNav_NewTweet_Button"]',
 };
 
 const clean = (s) => (s || "").replace(/\s+/g, " ").trim();
@@ -197,13 +198,13 @@ export async function insertIntoComposer(box, text) {
   return body.indexOf(needle) === body.lastIndexOf(needle);
 }
 
-export function waitForReplyComposer(timeout = 4000) {
+function waitForComposer(find, timeout, fallback) {
   return new Promise((resolve) => {
-    const existing = findReplyComposer();
+    const existing = find();
     if (existing) return resolve(existing);
 
     const observer = new MutationObserver(() => {
-      const box = findReplyComposer();
+      const box = find();
       if (box) {
         observer.disconnect();
         clearTimeout(timer);
@@ -214,9 +215,29 @@ export function waitForReplyComposer(timeout = 4000) {
 
     const timer = setTimeout(() => {
       observer.disconnect();
-      // A post's detail page opens an inline composer rather than a dialog, so fall
-      // back to any visible one only after the dialog never appeared.
-      resolve(visibleComposer(document));
+      resolve(fallback ? fallback() : null);
     }, timeout);
   });
+}
+
+export function waitForReplyComposer(timeout = 4000) {
+  // A post's detail page opens an inline composer rather than a dialog, so fall back
+  // to any visible one only after the dialog never appeared.
+  return waitForComposer(findReplyComposer, timeout, () => visibleComposer(document));
+}
+
+// Composing a new post wants the opposite scoping from a reply: the main composer,
+// which is either the inline box on the timeline or the dialog X opens from the
+// sidebar Post button.
+export function findPostComposer() {
+  const dialog = document.querySelector(DIALOG);
+  return dialog ? visibleComposer(dialog) : visibleComposer(document);
+}
+
+export function openPostComposer() {
+  document.querySelector(SEL.newPost)?.click();
+}
+
+export function waitForPostComposer(timeout = 4000) {
+  return waitForComposer(findPostComposer, timeout);
 }
