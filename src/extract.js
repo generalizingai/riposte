@@ -105,34 +105,53 @@ export function findReplyComposer() {
   return dialog ? visibleComposer(dialog) : null;
 }
 
-// Draft.js ignores textContent assignment because React never sees an input event.
-// execCommand("insertText") is deprecated but it is the one path that still produces
-// a real beforeinput/input pair, which is what the editor listens for.
+// Inserting into X's editor has exactly one safe shape: hand it an event it fully
+// owns and cancels, and never touch the DOM ourselves.
 //
-// There is deliberately NO synthetic InputEvent fallback here. Dispatching one after
-// a successful execCommand inserted the text twice, and because a synthetic event is
-// untrusted the editor updated its internal model while the DOM already held the
-// execCommand result. The two diverged, so the next backspace reconciled against the
-// wrong model and corrupted the box. The caller falls back to the clipboard instead.
+// execCommand("insertText") does a NATIVE DOM edit. Draft.js also takes the matching
+// input event into its own model, then reconciles by rendering that model at the
+// caret. The result is the text twice with the caret between the copies, and a model
+// that no longer matches the DOM, so the next backspace corrupts the box. Selecting a
+// DOM Range does not help either, because Draft tracks its own selection and ignores
+// ranges set behind its back.
+//
+// A paste event avoids all of it. Draft's paste handler reads clipboardData, calls
+// preventDefault, and inserts through its own model, so the DOM is only ever written
+// by the editor. dispatchEvent returns false when preventDefault was called, which is
+// how we know the editor actually took it. If it did not, nothing was mutated and the
+// caller can safely fall back to the clipboard.
 export async function insertIntoComposer(box, text) {
   box.focus();
 
-  const range = document.createRange();
-  range.selectNodeContents(box);
-  const selection = window.getSelection();
-  selection.removeAllRanges();
-  selection.addRange(range);
+  // selectAll changes the selection only, never the content, and it goes through the
+  // editor's own selection handling rather than around it.
+  document.execCommand("selectAll", false, null);
 
-  if (!document.execCommand("insertText", false, text)) return false;
+  const transfer = new DataTransfer();
+  transfer.setData("text/plain", text);
 
-  // React batches, so the DOM is not updated synchronously. Reading innerText on this
-  // tick is what produced the double insert; wait a frame before believing it.
+  const handled = !box.dispatchEvent(
+    new ClipboardEvent("paste", {
+      clipboardData: transfer,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+  if (!handled) return false;
+
+  // React batches, so give it a frame before believing what the DOM says.
   await new Promise((resolve) =>
     requestAnimationFrame(() => requestAnimationFrame(resolve)),
   );
 
-  const needle = clean(text).slice(0, 20);
-  return clean(box.innerText).includes(needle);
+  const body = clean(box.innerText);
+  const needle = clean(text).slice(0, 24);
+  if (!body.includes(needle)) return false;
+
+  // Guard against a regression of the duplication bug: if the needle landed twice,
+  // report failure so the caller falls back to the clipboard rather than leaving a
+  // doubled draft sitting in the composer.
+  return body.indexOf(needle) === body.lastIndexOf(needle);
 }
 
 export function waitForReplyComposer(timeout = 4000) {
