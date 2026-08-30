@@ -119,6 +119,35 @@ Posts also get their own anti-slop list, aimed at the register X rewards and rea
 "Here's the thing", no "Unpopular opinion", no hook-colon-list, no thread emoji, no closing "Thoughts?",
 no one-sentence-per-line profundity.
 
+## The review queue
+
+Finding posts worth answering costs more time than writing the answers. The queue takes that part.
+
+While a feed is open, Riposte collects the posts that scroll past. Nothing is sent anywhere and no API
+call happens during collection. When you press **Find posts**, it makes one batched call to triage the
+whole pool, picks the few you could genuinely add something to, drafts replies for those, and queues
+them with a line explaining why each was picked.
+
+You then read the batch and either **Bin** it or **Open** it, which navigates to the post and loads the
+draft into X's reply box. You press Reply.
+
+Triage is deliberately reluctant. It is told to skip posts where the only honest reply is agreement,
+posts outside what you actually know, engagement bait, and posts already buried in replies. An empty
+result is a valid answer, not a failure. Fill in **What you can speak to** in the options or it has no
+basis for judging relevance.
+
+### On autonomy
+
+**Riposte will not post on your behalf, and this is a design decision rather than an unfinished feature.**
+Every reply is one a human read and chose to send. There is no autonomous mode and no batch-post button.
+
+Three reasons, in the order that will matter to you. Automated replying is specifically named in X's
+platform manipulation policy and reply-spam is what their detection is tuned hardest against. A tool whose
+whole premise is "replies worth sending" cannot ship a mode that sends unread replies. And everyone
+receiving an autonomous reply would reasonably believe a person read their post.
+
+The queue removes the part that costs an hour. The part that costs a minute is the part worth keeping.
+
 ## Privacy
 
 Riposte has no servers. Nothing is collected, and nothing reaches the author of this extension.

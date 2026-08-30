@@ -35,6 +35,11 @@ function buildShell() {
   const toneSelect = enhanceSelect(tone);
   toneSelect.wrap.classList.add(`${P}-select--sm`);
 
+  const queue = el("button", `${P}-queue`, "Queue");
+  queue.type = "button";
+  queue.addEventListener("click", () => handlers.onQueue?.());
+  header.append(queue);
+
   const close = el("button", `${P}-close`, "×");
   close.title = "Close";
   close.addEventListener("click", hidePanel);
@@ -54,7 +59,13 @@ function buildShell() {
   });
 
   root.append(header, context, body, footer);
-  return { root, tone, toneSelect, context, body, input, submit, topic: null };
+  return { root, tone, toneSelect, queue, context, body, input, submit, topic: null };
+}
+
+export function setQueueCount(count) {
+  if (!panel) return;
+  panel.queue.textContent = count > 0 ? `Queue ${count}` : "Queue";
+  panel.queue.dataset.full = String(count > 0);
 }
 
 function setAngles(angles, selected) {
@@ -82,7 +93,10 @@ export function showPanel(opts) {
   panel.input.placeholder = composing
     ? "Optional steer: shorter, more specific, less certain"
     : "Optional steer: shorter, push back harder, mention the study";
-  panel.submit.textContent = composing ? "Write" : "Redraft";
+
+  panel.submit.textContent =
+    opts.mode === "queue" ? "Find posts" : composing ? "Write" : "Redraft";
+  panel.queue.textContent = opts.mode === "queue" ? "Back" : "Queue";
 
   panel.root.style.display = "flex";
   onVisibility?.(true);
@@ -215,4 +229,63 @@ export function setReplies(replies, maxChars) {
 
 export function clearInstruction() {
   if (panel) panel.input.value = "";
+}
+
+// The review queue. Each entry shows why it was picked, then one draft at a time so a
+// batch of five stays readable. Nothing here posts: "Open" navigates to the post and
+// loads the draft into X's own reply box, and the user presses Reply themselves.
+export function setQueueView(items, { onOpen, onBin }) {
+  if (!panel) return;
+  panel.body.textContent = "";
+
+  if (!items.length) {
+    panel.body.append(
+      el("div", `${P}-idle`, "Queue is empty. Browse X for a while, then press Find posts."),
+    );
+    return;
+  }
+
+  items.forEach((item) => {
+    const box = el("div", `${P}-qitem`);
+
+    const who = el("div", `${P}-qhead`);
+    who.append(
+      el("span", `${P}-who`, item.post.handle || item.post.author || "post"),
+      el("span", `${P}-what`, item.post.text || ""),
+    );
+    box.append(who);
+    box.append(el("div", `${P}-qreason`, item.reason));
+
+    let index = 0;
+    const draft = el("div", `${P}-text`, item.replies[0]?.text || "");
+    const angle = el("div", `${P}-angle`, item.replies[0]?.angle || "draft");
+    box.append(angle, draft);
+
+    const row = el("div", `${P}-row`);
+    const count = el("span", `${P}-count`, `1/${item.replies.length}`);
+    row.append(count);
+
+    if (item.replies.length > 1) {
+      const cycle = el("button", `${P}-btn`, "Next");
+      cycle.addEventListener("click", () => {
+        index = (index + 1) % item.replies.length;
+        draft.textContent = item.replies[index].text;
+        angle.textContent = item.replies[index].angle || "draft";
+        count.textContent = `${index + 1}/${item.replies.length}`;
+      });
+      row.append(cycle);
+    }
+
+    const bin = el("button", `${P}-btn`, "Bin");
+    bin.addEventListener("click", () => onBin?.(item));
+    row.append(bin);
+
+    const open = el("button", `${P}-btn ${P}-primary`, "Open");
+    open.title = "Go to the post with this draft loaded, ready for you to send";
+    open.addEventListener("click", () => onOpen?.(item, item.replies[index].text));
+    row.append(open);
+
+    box.append(row);
+    panel.body.append(box);
+  });
 }

@@ -22,9 +22,22 @@ import {
   setError,
   setIdle,
   setReplies,
+  setQueueView,
+  setQueueCount,
   clearInstruction,
 } from "./panel.js";
 import { TONES, POST_ANGLES } from "./prompt.js";
+import {
+  identify,
+  recordCandidates,
+  getPool,
+  clearPool,
+  getQueue,
+  setQueue,
+  removeFromQueue,
+  setPendingInsert,
+  takePendingInsert,
+} from "./watch.js";
 
 const TRIGGER = "riposte-trigger";
 let current = null; // { article, post, thread, tone }
@@ -110,7 +123,8 @@ function panelHandlers(mode, angles) {
     mode,
     angles,
     onInsert: insertDraft,
-    onRegenerate: (instruction) => run(instruction),
+    onRegenerate: (instruction) => (mode === "queue" ? runTriage() : run(instruction)),
+    onQueue: () => (mode === "queue" ? openCompose(null) : openQueue()),
     onTone: (value) => {
       current.tone = value;
       chrome.storage.local.set(mode === "compose" ? { postAngle: value } : { tone: value });
@@ -118,6 +132,53 @@ function panelHandlers(mode, angles) {
       run();
     },
   };
+}
+
+async function renderQueue(items) {
+  setQueueCount(items.length);
+  setQueueView(items, {
+    onBin: async (item) => {
+      await removeFromQueue(identify(item.post));
+      renderQueue(await getQueue());
+    },
+    // Navigating away and inserting on the other side, rather than posting from here.
+    // The last action is always the user pressing X's own Reply button.
+    onOpen: async (item, text) => {
+      await setPendingInsert({ url: item.post.url, text });
+      await removeFromQueue(identify(item.post));
+      window.location.href = item.post.url;
+    },
+  });
+}
+
+async function openQueue() {
+  current = { mode: "queue", tone: "insightful" };
+  showPanel({ ...panelHandlers("queue", TONES), tone: "insightful" });
+  renderQueue(await getQueue());
+}
+
+async function runTriage() {
+  const pool = await getPool();
+  setLoading(`Reading ${pool.length} posts you scrolled past and picking the ones worth answering`);
+
+  const response = await ask("TRIAGE", { pool, limit: 5 });
+  if (!response?.ok) return setError(response?.error || "No response from the extension.");
+
+  const { items, considered } = response.data;
+  const existing = await getQueue();
+  const seen = new Set(existing.map((item) => identify(item.post)));
+  const merged = [...existing, ...items.filter((item) => !seen.has(identify(item.post)))];
+
+  await setQueue(merged);
+  await clearPool();
+
+  if (!merged.length) {
+    setQueueCount(0);
+    return setIdle(
+      `Looked at ${considered} posts and none were worth a reply. That is a normal answer, not a failure.`,
+    );
+  }
+  renderQueue(merged);
 }
 
 const identity = (post) => `${post.handle}|${(post.text || "").slice(0, 40)}`;
@@ -224,8 +285,64 @@ function inject(article) {
   bar.append(makeButton(article));
 }
 
+// Collecting is throttled rather than run on every mutation batch: X mutates the feed
+// constantly, and reading innerText off every article each time would be felt.
+let lastCollect = 0;
+
+function collect() {
+  const now = Date.now();
+  if (now - lastCollect < 2000) return;
+  lastCollect = now;
+  recordCandidates([...document.querySelectorAll(SEL.tweet)].map(extractPost));
+}
+
 function scan() {
   for (const article of document.querySelectorAll(SEL.tweet)) inject(article);
+  collect();
+}
+
+function waitFor(find, timeout = 8000) {
+  return new Promise((resolve) => {
+    const existing = find();
+    if (existing) return resolve(existing);
+
+    const observer = new MutationObserver(() => {
+      const found = find();
+      if (found) {
+        observer.disconnect();
+        clearTimeout(timer);
+        resolve(found);
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    const timer = setTimeout(() => {
+      observer.disconnect();
+      resolve(null);
+    }, timeout);
+  });
+}
+
+// Picked up after the queue navigates here. The draft is loaded into X's reply box and
+// left there; sending it is still a deliberate press of X's own Reply button.
+async function consumePendingInsert() {
+  const pending = await takePendingInsert();
+  if (!pending || !location.href.startsWith(pending.url)) return;
+
+  const article = await waitFor(() => document.querySelector(SEL.tweet));
+  if (!article) return;
+
+  current = {
+    mode: "reply",
+    article,
+    post: extractPost(article),
+    context: extractContext(article),
+    tone: "insightful",
+  };
+
+  article.querySelector(SEL.replyButton)?.click();
+  const box = await waitForReplyComposer();
+  if (box) await insertIntoComposer(box, pending.text);
 }
 
 // X is a SPA that recycles nodes constantly, so a debounced observer beats trying to
@@ -242,6 +359,7 @@ const observer = new MutationObserver(() => {
 observer.observe(document.body, { childList: true, subtree: true });
 scan();
 mountLauncher();
+consumePendingInsert();
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && isPanelOpen()) hidePanel();

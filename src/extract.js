@@ -13,6 +13,7 @@ export const SEL = {
   composer: '[data-testid^="tweetTextarea_"]',
   likeButton: '[data-testid="like"], [data-testid="unlike"]',
   newPost: '[data-testid="SideNav_NewTweet_Button"]',
+  permalink: 'a[href*="/status/"]',
 };
 
 const clean = (s) => (s || "").replace(/\s+/g, " ").trim();
@@ -60,6 +61,16 @@ function readReplyingTo(article) {
   return match ? match[1] : "";
 }
 
+// The timestamp anchor is the post's permalink. The queue needs it to navigate back
+// to a post long after the article node it came from has been recycled away.
+function readPermalink(article) {
+  for (const anchor of article.querySelectorAll(SEL.permalink)) {
+    const href = anchor.getAttribute("href") || "";
+    if (/^\/[^/]+\/status\/\d+$/.test(href)) return `https://x.com${href}`;
+  }
+  return "";
+}
+
 function readEngagement(article) {
   const label = article.querySelector(SEL.likeButton)?.getAttribute("aria-label") || "";
   const n = label.match(/([\d,.]+)\s*(K|M)?\s*likes?/i);
@@ -79,6 +90,7 @@ export function extractPost(article) {
     link: clean(article.querySelector(SEL.card)?.innerText).slice(0, 300),
     engagement: readEngagement(article),
     replyingTo: readReplyingTo(article),
+    url: readPermalink(article),
   };
 }
 

@@ -5,6 +5,7 @@ export const DEFAULTS = {
   tone: "insightful",
   postAngle: "conversational",
   voiceSamples: "",
+  expertise: "",
   maxChars: 280,
   useSearch: false,
 };

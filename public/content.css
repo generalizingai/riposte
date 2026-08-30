@@ -395,3 +395,61 @@
   font-size: 13px;
   color: var(--rip-muted);
 }
+
+/* Review queue. Each entry carries the post, why it was picked, and one draft at a
+   time, so a batch of five stays readable in a 400px panel. */
+
+.riposte-queue {
+  all: unset;
+  cursor: pointer;
+  font: 600 11px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  padding: 5px 9px;
+  border-radius: 5px;
+  border: 1px solid var(--rip-line);
+  background: #121212;
+  color: #cfcfcf;
+  white-space: nowrap;
+  transition: background 130ms ease, color 130ms ease;
+}
+.riposte-queue:hover {
+  background: #1e1e1e;
+  color: var(--rip-fg);
+}
+.riposte-queue[data-full="true"] {
+  border-color: rgba(255, 255, 255, 0.24);
+  color: var(--rip-fg);
+}
+
+/* Nothing in the queue view is per-angle, and there is no draft to steer yet. */
+.riposte-panel[data-mode="queue"] .riposte-select,
+.riposte-panel[data-mode="queue"] .riposte-instruction,
+.riposte-panel[data-mode="queue"] .riposte-context {
+  display: none;
+}
+.riposte-panel[data-mode="queue"] .riposte-regen {
+  flex: 1;
+  text-align: center;
+}
+
+.riposte-qitem {
+  border: 1px solid var(--rip-line);
+  border-radius: 6px;
+  padding: 11px 12px;
+  background: var(--rip-surface);
+}
+.riposte-qhead {
+  display: flex;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--rip-muted);
+  margin-bottom: 6px;
+  min-width: 0;
+}
+.riposte-qreason {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--rip-muted);
+  padding-left: 9px;
+  border-left: 2px solid var(--rip-line-strong);
+  margin-bottom: 10px;
+}

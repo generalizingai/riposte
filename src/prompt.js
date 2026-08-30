@@ -215,6 +215,78 @@ export function buildPostMessage({ topic, source, customInstruction }) {
   return lines.join("\n");
 }
 
+// Choosing what to answer is most of the value. A queue full of posts the user has
+// nothing to say about is worse than no queue, because it trains them to approve
+// without reading.
+export function buildScoreSystem({ voiceSamples, expertise, limit }) {
+  return `You are triaging a feed for one person, deciding which posts are worth them
+replying to. You are not writing replies here, only choosing.
+
+${
+  expertise?.trim()
+    ? `What this person can actually speak to, from experience:\n${expertise.trim()}`
+    : "No stated expertise. Infer what they know from their writing samples, and be conservative."
+}
+
+${voiceSection(voiceSamples)}
+
+Pick a post only when this person could add something specific and true that is not
+already in the thread. A first-hand number, a mechanism, a counter-example, a correction.
+
+Skip a post when:
+- The only honest reply is agreement, praise, or a restatement.
+- It is outside what this person actually knows. Adjacent is not the same as known.
+- It is engagement bait: a poll-shaped question, a "reply with X", a rage prompt.
+- It already has so many replies that another one will not be read.
+- It is a personal announcement, a joke, or grief. Replying to those with a drafted
+  take reads as mining someone's post for reach.
+
+Returning fewer picks is correct and expected. If nothing qualifies, return an empty
+list rather than filling a quota. Choose at most ${limit}.`;
+}
+
+export function buildScoreMessage(posts) {
+  const lines = ["Posts to triage, indexed from 0:", ""];
+
+  posts.forEach((post, index) => {
+    lines.push(`[${index}] ${post.handle || post.author}${post.engagement ? ` (${post.engagement})` : ""}`);
+    lines.push(post.text);
+    if (post.quoted) lines.push(`  quoting: ${post.quoted}`);
+    lines.push("");
+  });
+
+  return lines.join("\n");
+}
+
+export const SCORE_TOOL = {
+  name: "submit_selection",
+  description: "Return the posts worth replying to. Call this once. An empty list is a valid answer.",
+  strict: true,
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["picks"],
+    properties: {
+      picks: {
+        type: "array",
+        description: "The posts worth answering, best first. May be empty.",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["index", "reason"],
+          properties: {
+            index: { type: "integer", description: "Zero-based index of the post in the list." },
+            reason: {
+              type: "string",
+              description: "One short line on what this person could add that is not already there.",
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
 // A strict tool is the reliable way to get schema-valid JSON back while still
 // leaving the model free to call web search first.
 export const SUBMIT_TOOL = {

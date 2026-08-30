@@ -2,7 +2,16 @@ import { DEFAULTS } from "./settings.js";
 import { TONES } from "./prompt.js";
 import { enhanceAll } from "./select.js";
 
-const FIELDS = ["apiKey", "model", "effort", "tone", "maxChars", "useSearch", "voiceSamples"];
+const FIELDS = [
+  "apiKey",
+  "model",
+  "effort",
+  "tone",
+  "maxChars",
+  "useSearch",
+  "voiceSamples",
+  "expertise",
+];
 const $ = (id) => document.getElementById(id);
 const status = $("status");
 

@@ -4,7 +4,10 @@ import {
   buildUserMessage,
   buildPostSystem,
   buildPostMessage,
+  buildScoreSystem,
+  buildScoreMessage,
   SUBMIT_TOOL,
+  SCORE_TOOL,
 } from "./prompt.js";
 import { getSettings } from "./settings.js";
 
@@ -129,8 +132,58 @@ async function testKey(apiKey) {
   return true;
 }
 
+// Triage runs as one call over the whole pool rather than one per post, which keeps a
+// pass over 100 candidates to roughly the cost of a single draft.
+async function triage({ pool, limit = 5 }) {
+  const settings = await getSettings();
+  if (!settings.apiKey) {
+    throw new Error("No API key set. Open the extension options and paste your Anthropic API key.");
+  }
+  if (!pool?.length) {
+    throw new Error("Nothing collected yet. Leave a feed open for a while, then run this again.");
+  }
+
+  const client = makeClient(settings.apiKey);
+
+  const response = await client.beta.messages.create({
+    model: settings.model,
+    max_tokens: 8000,
+    betas: ["server-side-fallback-2026-07-01"],
+    fallbacks: "default",
+    output_config: { effort: settings.effort },
+    system: buildScoreSystem({
+      voiceSamples: settings.voiceSamples,
+      expertise: settings.expertise,
+      limit,
+    }),
+    messages: [{ role: "user", content: buildScoreMessage(pool) }],
+    tools: [SCORE_TOOL],
+  });
+
+  const selection = response.content.find(
+    (block) => block.type === "tool_use" && block.name === SCORE_TOOL.name,
+  );
+  const picks = (selection?.input?.picks || [])
+    .filter((pick) => pool[pick.index])
+    .slice(0, limit);
+
+  if (!picks.length) return { items: [], considered: pool.length };
+
+  // Drafting is per-post and independent, so run them together rather than serially.
+  const items = await Promise.all(
+    picks.map(async (pick) => {
+      const post = pool[pick.index];
+      const drafts = await generate({ mode: "reply", post, context: { root: null, parent: null } });
+      return { post, reason: pick.reason, replies: drafts.replies };
+    }),
+  );
+
+  return { items, considered: pool.length };
+}
+
 const HANDLERS = {
   GENERATE: (payload) => generate(payload),
+  TRIAGE: (payload) => triage(payload),
   TEST_KEY: (payload) => testKey(payload.apiKey),
 };
 
